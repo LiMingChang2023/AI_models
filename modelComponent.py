@@ -23,6 +23,7 @@ class attention(layers.Layer):
         batch_size = tf.shape(x)[0]
         x = tf.reshape(x, (batch_size, -1, self.num_head, self.head_dim))
         x = tf.transpose(x, perm=[0, 2, 1, 3])
+        return x
 
     def mask(self, seqlen):
         mask = tf.ones((seqlen, seqlen), dtype=tf.float32)
@@ -31,8 +32,8 @@ class attention(layers.Layer):
         return mask
 
     def call(self, keys, queries, values, use_mask=False, training=False):
-        batch_size = keys.shape[0]
-        seqlen = keys.shape[1]
+        batch_size = tf.shape(keys)[0]
+        seqlen = tf.shape(keys)[1]
         
         queries = self.query(queries)
         keys = self.key(keys)
@@ -54,7 +55,7 @@ class attention(layers.Layer):
         if training:
             scores = self.dropout(scores, training=training)
 
-        out = tf.einsum('nhqk, nhvd->nhqd', scores, values)
+        out = tf.einsum('nhqk, nhvd->nhvd', scores, values)
         out = tf.transpose(out, perm=[0, 2, 1, 3])
         out = tf.reshape(out, (batch_size, seqlen, self.d_model))
         
@@ -110,9 +111,9 @@ class attentionLayer(layers.Layer):
         self.add_2 = layers.Add()
         self.ln_2 = layers.LayerNormalization(epsilon=1e-08)
 
-    def call(self, query, key, value, mask=False, training=False):
+    def call(self, query, key, value, use_mask=False, training=False):
         
-        attn_out = self.attention(query, key, value, mask=mask, training=training)
+        attn_out = self.attention(query, key, value, use_mask=use_mask, training=training)
         x = self.add_1([query, attn_out])
         x = self.ln_1(x)
         
