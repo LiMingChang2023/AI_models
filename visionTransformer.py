@@ -16,12 +16,16 @@ class PosEmbedding(layers.Layer):
         self.add = layers.Add()
         
     def call(self, x):
-        x = self.add([x, self.pos_weight])
+        shape = tf.shape(x)
+
+        pos_enc = tf.broadcast_to(self.pos_weight, shape)
+
+        x = self.add([x, pos_enc])
 
         return x
         
 # patch without overlap
-class VisionTransformer(layers.Layer):
+class VisionTransformer(models.Model):
     
     def __init__(self, shape, num_head, num_layers, patch, _class=10):
         super().__init__()
@@ -38,22 +42,22 @@ class VisionTransformer(layers.Layer):
         self.fc = self.clsBlock(3, _class)
 
     def patchEmbedding(self, x, batch):
-
+        
         x = tf.reshape(x, (batch, self.new_h, self.patch, self.new_w, self.patch, -1))
         x = tf.transpose(x, perm=[0, 1, 3, 2, 4, 5])
         x = tf.reshape(x, (batch, self.new_h * self.new_w, -1))
-        
+
         x = self.pos_enc(x)
 
         return x
     
-    def clsBlock(self, layers, cls):
+    def clsBlock(self, n_layers, cls):
         model = models.Sequential()
-        for _ in range(layers):
+        for _ in range(n_layers):
             model.add(layers.Dense(self.d_model * 4, activation='relu'))
             model.add(layers.Dense(self.d_model))
 
-        model.add(layers.Dense(cls), activation='softmax')
+        model.add(layers.Dense(cls, activation='softmax'))
         return model
 
     @tf.function
@@ -68,9 +72,6 @@ class VisionTransformer(layers.Layer):
 
         for attn in self.attn:
             x = attn(x, x, x, use_mask=False, training=training)
-
-        x = self.ffn_1(x)
-        x = self.ffn_2(x)
 
         # Use the output of the classification token
         class_output = x[:, 0, :]  # Get the class token's output

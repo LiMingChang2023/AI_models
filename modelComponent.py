@@ -55,7 +55,7 @@ class attention(layers.Layer):
         if training:
             scores = self.dropout(scores, training=training)
 
-        out = tf.einsum('nhqk, nhvd->nhvd', scores, values)
+        out = tf.einsum('nhqk, nhvd->nhqd', scores, values)
         out = tf.transpose(out, perm=[0, 2, 1, 3])
         out = tf.reshape(out, (batch_size, seqlen, self.d_model))
         
